@@ -68,6 +68,33 @@ class AccountMoveLineInherit(models.Model):
 class AccountMove(models.Model):
     _inherit = 'account.move'
     
+    second_amount = fields.Monetary(string='Second Amount', default=0.0, readonly=False, store=True,
+                                    compute="exchange_second_amount")
+    third_amount = fields.Monetary(string='Third Amount', default=0.0, readonly=False, store=True,
+                                   compute="exchange_third_amount")
+    second_currency = fields.Many2one('res.currency', related ="company_id.second_currency")
+    third_currency = fields.Many2one('res.currency', related ="company_id.third_currency")
+
+
+    @api.depends('amount_total','amount_residual')
+    def exchange_second_amount(self):
+        for rec in self:
+            second = rec.env['res.currency'].search([('id', '=', rec.company_id.second_currency.id)])
+            if rec.amount_residual:
+                rec.second_amount = rec.currency_id.compute(rec.amount_residual, second)
+            else:
+                rec.second_amount = rec.currency_id.compute(rec.amount_total, second)
+
+
+    @api.depends('amount_total', 'amount_residual')
+    def exchange_third_amount(self):
+        for rec in self:
+            third = rec.env['res.currency'].search([('id', '=', rec.company_id.third_currency.id)])
+            if rec.amount_residual:
+                rec.third_amount = rec.currency_id.compute(rec.amount_residual, third)
+            else:
+                rec.third_amount = rec.currency_id.compute(rec.amount_total, third)
+    
     
     @api.onchange('invoice_line_ids')
     def get_debit_credit(self):
@@ -81,7 +108,45 @@ class AccountMove(models.Model):
                  'third_credit_id': l.company_currency_id.compute(l.credit, third), 
                 }
             )
+ 
+class AccountPaymentInherit(models.Model):
+    _inherit = 'account.payment'
+
+    second_amount = fields.Monetary(string='Second Amount', default=0.0)
+    third_amount = fields.Monetary(string='Third Amount', default=0.0)
+    second_currency = fields.Many2one('res.currency', related="company_id.second_currency")
+    third_currency = fields.Many2one('res.currency', related="company_id.third_currency")
+
+
             
+class AccountPaymentRegister(models.TransientModel):
+    _inherit = 'account.payment.register'
+    
+    second_currency = fields.Many2one('res.currency', related="company_id.second_currency")
+    third_currency = fields.Many2one('res.currency', related="company_id.third_currency")
+    second_amount = fields.Monetary(currency_field='second_currency', string='Second Amount', default=0.0, store=True,
+                                    compute="exchange_second_amount_wiz")
+    third_amount = fields.Monetary(currency_field='third_currency', string='Third Amount', default=0.0, store=True,
+                                    compute="exchange_third_amount_wiz")
+    
+    @api.depends('amount')
+    def exchange_second_amount_wiz(self):
+        for wizard in self:
+            second = wizard.env['res.currency'].search([('id', '=', wizard.company_id.second_currency.id)])
+            wizard.second_amount = wizard.currency_id.compute(wizard.amount, second)
+            
+    @api.depends('amount')
+    def exchange_third_amount_wiz(self):
+        for wizard in self:
+            third = wizard.env['res.currency'].search([('id', '=', wizard.company_id.third_currency.id)])
+            wizard.third_amount = wizard.currency_id.compute(wizard.amount, third)
+            
+    def _create_payment_vals_from_wizard(self):
+        # OVERRIDE
+        payment_vals = super()._create_payment_vals_from_wizard()
+        payment_vals['second_amount'] = self.second_amount
+        return payment_vals        
+
 class SaleOrder(models.Model):
     _inherit = 'sale.order'
     
