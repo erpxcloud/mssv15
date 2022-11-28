@@ -6,8 +6,8 @@
         'base','account','account_reports',
     ],
     'data': [
-#         'views/view.xml',
-#         'views/trial_balance.xml'
+        'views/view.xml',
+        'views/trial_balance.xml'
     ],
     'installable': True,
     'auto_install': False,
